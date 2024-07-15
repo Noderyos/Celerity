@@ -67,13 +67,15 @@ char* get_header(http_request *req, char* name)
 }
 
 
-void handle_request(http_request *req, int max_rsp_len)
+http_response handle_request(http_request *req)
 {
+    http_response resp = {};
+    resp.response = malloc(MAX_RESP_SIZE);
+    resp.status_code = 413;
 
-    char* response = req->response;
+    char* response = resp.response;
 
-    strcpy(response, "HTTP/1.1 200\r\nContent-Type: text/html\r\n\r\n");
-    strcat(response, "<h1>You have requested the path ");
+    strcpy(response, "<h1>You have requested the path ");
     strcat(response, req->path);
     strcat(response, "</h1><br>Headers list : <ul>");
     for (int i = 0; i < req->header_count; ++i)
@@ -86,12 +88,15 @@ void handle_request(http_request *req, int max_rsp_len)
         strcat(response, h.value);
         strcat(response, "</li><br>");
     }
+    resp.response_size = strlen(resp.response);
+
+    return resp;
 }
 
 #define STATUS_COUNT 6
 
 struct http_status{
-    int code;
+    unsigned int code;
     char* desc;
 } http_status[] = {
         {200, "OK"},
@@ -102,25 +107,28 @@ struct http_status{
         {431, "Request Header Fields Too Large"},
 };
 
-int prepare_error(http_request *req, int code)
+http_response generate_error(http_request *req, unsigned int status)
 {
-    int idx = -1;
+    UNUSED(req);
+    http_response resp = {};
+
+    resp.status_code = status;
+    resp.response = get_status_text(status);
+    resp.response_size = strlen(resp.response);
+
+
+
+    return resp;
+}
+
+char* get_status_text(unsigned int status)
+{
     for (int i = 0; i < STATUS_COUNT; ++i)
     {
-        if(http_status[i].code == code)
+        if(http_status[i].code == status)
         {
-            idx = i;
-            break;
+            return http_status[i].desc;
         }
     }
-    if(idx == -1) return -1;
-
-    struct http_status status = http_status[idx];
-    snprintf(
-            req->response, MAX_RESP_SIZE,
-            "HTTP/1.1 %d %s\r\n\r\n%s",
-            status.code, status.desc, status.desc
-    );
-
-    return 0;
+    return NULL;
 }

@@ -13,6 +13,8 @@
 #define MAX_URL_SIZE 2048
 #define MAX_RESP_SIZE 1024
 
+#define UNUSED(x) (void)(x)
+
 typedef enum {
     HTTP_GET,
     HTTP_POST,
@@ -35,15 +37,23 @@ typedef struct {
     char path[MAX_URL_SIZE];
     int header_count;
     http_header headers[MAX_HEADER_COUNT];
-    char *response;
 } http_request;
 
-void handle_request(http_request *req, int max_rsp_len);
+typedef struct {
+    unsigned int status_code;
+    size_t headers_size;
+    http_header headers[MAX_HEADER_COUNT];
+    size_t response_size;
+    char *response;
+} http_response;
+
+http_response handle_request(http_request *req);
 
 int parse_before_header(http_request *req, char* line);
 int parse_header(http_request *req, char* line);
 
 char* get_header(http_request *req, char* name);
-int prepare_error(http_request *req, int code);
+http_response generate_error(http_request *req, unsigned int status);
+char* get_status_text(unsigned int status);
 
 #endif

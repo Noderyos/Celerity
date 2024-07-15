@@ -6,8 +6,13 @@
 #include "http.h"
 
 int parse_http_headers(int fd, http_request *req);
+void send_response(int fd, http_response *resp);
 
-int main(int argc, char *argv[]) {
+int main(int argc, char *argv[])
+{
+    UNUSED(argc);
+    UNUSED(argv);
+
     int sockfd = socket(AF_INET, SOCK_STREAM, 0);
 
     if(sockfd < 0)
@@ -40,7 +45,6 @@ int main(int argc, char *argv[]) {
         return -1;
     }
 
-
     int clientfd = accept(sockfd, NULL, NULL);
     if(clientfd < 0)
     {
@@ -50,13 +54,20 @@ int main(int argc, char *argv[]) {
 
 
     http_request req = {0};
-    char response[MAX_RESP_SIZE+1] = {0};
-    req.response = response;
-    if(parse_http_headers(clientfd, &req) == 0)
+    http_response resp;
+
+    int error_code = parse_http_headers(clientfd, &req);
+
+    if(error_code == 0)
     {
-        handle_request(&req, MAX_RESP_SIZE);
+        resp = handle_request(&req);
     }
-    send(clientfd, response, strlen(response), 0);
+    else
+    {
+        resp = generate_error(&req, error_code);
+    }
+
+    send_response(clientfd, &resp);
 
     close(clientfd);
     close(sockfd);
@@ -73,34 +84,25 @@ int parse_http_headers(int fd, http_request *req)
     int line_idx = 0;
     while (0 != recv(fd, buf, 1, 0))
     {
-        if(buf[0] == '\r')
+        if (buf[0] == '\r')
         {
             recv(fd, buf, 1, 0);  // Skip \n after \r
             line[line_idx] = 0;
 
-            if(line_idx == 0) break;
+            if (line_idx == 0) break;
 
-            if(header_idx > MAX_HEADER_COUNT)
+            if (header_idx > MAX_HEADER_COUNT)
             {
-                prepare_error(req, 413);
-                return -1;
+                return 413;
             }
 
             if (header_idx++ < 0)
             {
-                if(parse_before_header(req, line) < 0)
-                {
-                    prepare_error(req, 400);
-                    return -1;
-                }
+                if(parse_before_header(req, line) < 0) return 400;
             }
             else
             {
-                if(parse_header(req, line) < 0)
-                {
-                    prepare_error(req, 400);
-                    return -1;
-                }
+                if(parse_header(req, line) < 0) return 400;
             }
             header_idx++;
             line_idx = 0;
@@ -109,12 +111,44 @@ int parse_http_headers(int fd, http_request *req)
         {
             if(line_idx > MAX_HEADER_SIZE)
             {
-                if(header_idx < 0) prepare_error(req, 414);
-                else               prepare_error(req, 431);
-                return -1;
+                if(header_idx < 0) return 414;
+                else return 431;
             }
             line[line_idx++] = buf[0];
         }
     }
     return 0;
+}
+
+
+void send_response(int fd, http_response *resp){
+
+    send(fd, "HTTP/1.1 ", 9, 0);
+
+    // Send status code
+    int code = resp->status_code;
+    char buf[3];
+    buf[0] = (char)(48 + code/100); code -= code/100*100;
+    buf[1] = (char)(48 + code/10);
+    buf[2] = (char)(48 + (code%10));
+    send(fd, buf, 3, 0);
+
+    // Send status text
+    send(fd, " ", 1, 0);
+    char* status_text = get_status_text(resp->status_code);
+    send(fd, status_text, strlen(status_text), 0);
+    send(fd, "\r\n", 2, 0);
+
+    // Send headers
+    for (size_t i = 0; i < resp->headers_size; ++i)
+    {
+        send(fd, resp->headers[i].name, strlen(resp->headers[i].name), 0);
+        send(fd, ": ", 2, 0);
+        send(fd, resp->headers[i].value, strlen(resp->headers[i].value), 0);
+        send(fd, "\r\n", 2, 0);
+    }
+    send(fd, "\r\n", 2, 0);
+
+    // Send content
+    send(fd, resp->response, resp->response_size, 0);
 }
