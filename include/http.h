@@ -27,33 +27,37 @@ typedef enum {
 } http_method;
 
 typedef struct {
-    char _data[MAX_HEADER_SIZE];
-    char* name;
-    char* value;
+    char name[MAX_HEADER_SIZE];
+    char value[MAX_HEADER_SIZE];
 } http_header;
 
 typedef struct {
     http_method method;
     char path[MAX_URL_SIZE];
-    int header_count;
+    size_t header_count;
     http_header headers[MAX_HEADER_COUNT];
 } http_request;
 
 typedef struct {
     unsigned int status_code;
-    size_t headers_size;
+    size_t headers_count;
     http_header headers[MAX_HEADER_COUNT];
     size_t response_size;
     char *response;
 } http_response;
+
+typedef http_response (*handle_t)(http_request *);
 
 http_response handle_request(http_request *req);
 
 int parse_before_header(http_request *req, char* line);
 int parse_header(http_request *req, char* line);
 
-char* get_header(http_request *req, char* name);
+char* get_header(http_request *req, char *name);
+int set_header(http_response *resp, char *name, char *value);
 http_response generate_error(http_request *req, unsigned int status);
 char* get_status_text(unsigned int status);
+
+char* pretty_method(http_method method);
 
 #endif

@@ -46,11 +46,8 @@ int parse_header(http_request *req, char* line)
 
     if(name_size > MAX_HEADER_NAME_SIZE) return -1;
 
-    strncpy(req->headers[req->header_count]._data, line, MAX_HEADER_SIZE);
-    req->headers[req->header_count]._data[name_size] = 0;
-
-    req->headers[req->header_count].name = req->headers[req->header_count]._data;
-    req->headers[req->header_count].value = req->headers[req->header_count].name + name_size + 2;
+    strncpy(req->headers[req->header_count].name, line, name_size);
+    strncpy(req->headers[req->header_count].value, line+name_size+2, MAX_HEADER_SIZE);
 
     req->header_count++;
     return 0;
@@ -58,14 +55,27 @@ int parse_header(http_request *req, char* line)
 
 char* get_header(http_request *req, char* name)
 {
-    for (int i = 0; i < req->header_count; ++i)
+    for (size_t i = 0; i < req->header_count; ++i)
     {
-        http_header h = req->headers[i];
-        if(strcmp(h.name, name) == 0) return h.value;
+        if(strcmp(req->headers[i].name, name) == 0) return req->headers[i].value;
     }
     return NULL;
 }
 
+int set_header(http_response *resp, char *name, char *value){
+    UNUSED(value);
+    for (size_t i = 0; i < resp->headers_count; ++i)
+    {
+        if(strcmp(resp->headers[i].name, name) == 0){
+            strncpy(resp->headers[i].value, value, MAX_HEADER_SIZE);
+            return 0;
+        }
+    }
+    if(resp->headers_count == MAX_HEADER_COUNT) return -1;
+    strncpy(resp->headers[resp->headers_count].value, value, MAX_HEADER_SIZE);
+    strncpy(resp->headers[resp->headers_count++].name, name, MAX_HEADER_SIZE);
+    return 0;
+}
 
 http_response handle_request(http_request *req)
 {
@@ -78,7 +88,7 @@ http_response handle_request(http_request *req)
     strcpy(response, "<h1>You have requested the path ");
     strcat(response, req->path);
     strcat(response, "</h1><br>Headers list : <ul>");
-    for (int i = 0; i < req->header_count; ++i)
+    for (size_t i = 0; i < req->header_count; ++i)
     {
         http_header h = req->headers[i];
 
@@ -116,8 +126,6 @@ http_response generate_error(http_request *req, unsigned int status)
     resp.response = get_status_text(status);
     resp.response_size = strlen(resp.response);
 
-
-
     return resp;
 }
 
@@ -131,4 +139,20 @@ char* get_status_text(unsigned int status)
         }
     }
     return NULL;
+}
+
+char* pretty_method(http_method method)
+{
+    switch (method)
+    {
+        case HTTP_GET: return "GET";
+        case HTTP_POST: return "POST";
+        case HTTP_PUT: return "PUT";
+        case HTTP_DELETE: return "DELETE";
+        case HTTP_PATCH: return "PATCH";
+        case HTTP_HEAD: return "HEAD";
+        case HTTP_OPTIONS: return "OPTIONS";
+        case HTTP_TRACE: return "TRACE";
+        default: return "ERR";
+    }
 }

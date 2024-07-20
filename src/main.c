@@ -22,18 +22,20 @@ int main(int argc, char *argv[])
     }
 
     int o = 1;
-    if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &o, sizeof(o)) < 0)
+    if(setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
+                  &o, sizeof(o)) < 0)
     {
         perror("setsockopt");
         return -1;
     }
 
-    struct sockaddr_in sock_info = {0};
-    sock_info.sin_family = AF_INET;
-    sock_info.sin_port = htons(8080);
-    sock_info.sin_addr.s_addr = 0x0;
+    struct sockaddr_in server_addr = {0};
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_port = htons(8080);
+    server_addr.sin_addr.s_addr = 0x0;
 
-    if(bind(sockfd, (struct sockaddr *)&sock_info, sizeof(sock_info)) < 0)
+    if(bind(sockfd,
+            (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
     {
         perror("bind");
         return -1;
@@ -45,13 +47,16 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    int clientfd = accept(sockfd, NULL, NULL);
-    if(clientfd < 0)
-    {
+    struct sockaddr_in client_addr;
+    socklen_t client_addr_len = sizeof(client_addr);
+
+    int clientfd = accept(sockfd, (struct sockaddr*)&client_addr, &client_addr_len);
+    if (clientfd < 0) {
         perror("accept");
         return -1;
     }
-
+    char client_ip[16];
+    inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, INET_ADDRSTRLEN);
 
     http_request req = {0};
     http_response resp;
@@ -66,6 +71,9 @@ int main(int argc, char *argv[])
     {
         resp = generate_error(&req, error_code);
     }
+
+    printf("%s - %s %s - %d\n",
+           client_ip, pretty_method(req.method), req.path, resp.status_code);
 
     send_response(clientfd, &resp);
 
@@ -140,7 +148,7 @@ void send_response(int fd, http_response *resp){
     send(fd, "\r\n", 2, 0);
 
     // Send headers
-    for (size_t i = 0; i < resp->headers_size; ++i)
+    for (size_t i = 0; i < resp->headers_count; ++i)
     {
         send(fd, resp->headers[i].name, strlen(resp->headers[i].name), 0);
         send(fd, ": ", 2, 0);
