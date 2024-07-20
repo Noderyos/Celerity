@@ -77,32 +77,6 @@ int set_header(http_response *resp, char *name, char *value){
     return 0;
 }
 
-http_response handle_request(http_request *req)
-{
-    http_response resp = {};
-    resp.response = malloc(MAX_RESP_SIZE);
-    resp.status_code = 413;
-
-    char* response = resp.response;
-
-    strcpy(response, "<h1>You have requested the path ");
-    strcat(response, req->path);
-    strcat(response, "</h1><br>Headers list : <ul>");
-    for (size_t i = 0; i < req->header_count; ++i)
-    {
-        http_header h = req->headers[i];
-
-        strcat(response, "<li>Name = ");
-        strcat(response, h.name);
-        strcat(response, "<br>Value = ");
-        strcat(response, h.value);
-        strcat(response, "</li><br>");
-    }
-    resp.response_size = strlen(resp.response);
-
-    return resp;
-}
-
 #define STATUS_COUNT 6
 
 struct http_status{
@@ -155,4 +129,83 @@ char* pretty_method(http_method method)
         case HTTP_TRACE: return "TRACE";
         default: return "ERR";
     }
+}
+
+int parse_http_headers(int fd, http_request *req)
+{
+    int header_idx = -1;
+
+    char line[MAX_HEADER_SIZE+1];
+    char buf[1];
+    int line_idx = 0;
+    while (0 != recv(fd, buf, 1, 0))
+    {
+        if (buf[0] == '\r')
+        {
+            recv(fd, buf, 1, 0);  // Skip \n after \r
+            line[line_idx] = 0;
+
+            if (line_idx == 0) break;
+
+            if (header_idx > MAX_HEADER_COUNT)
+            {
+                return 413;
+            }
+
+            if (header_idx++ < 0)
+            {
+                if(parse_before_header(req, line) < 0) return 400;
+            }
+            else
+            {
+                if(parse_header(req, line) < 0) return 400;
+            }
+            header_idx++;
+            line_idx = 0;
+        }
+        else
+        {
+            if(line_idx > MAX_HEADER_SIZE)
+            {
+                if(header_idx < 0) return 414;
+                else return 431;
+            }
+            line[line_idx++] = buf[0];
+        }
+    }
+    return 0;
+}
+
+
+void send_response(int fd, http_response *resp)
+{
+
+    send(fd, "HTTP/1.1 ", 9, 0);
+
+    // Send status code
+    int code = resp->status_code;
+    char buf[3];
+    buf[0] = (char)(48 + code/100);
+    buf[1] = (char)(48 + (code%100)/10);
+    buf[2] = (char)(48 + (code%10));
+    send(fd, buf, 3, 0);
+
+    // Send status text
+    send(fd, " ", 1, 0);
+    char* status_text = get_status_text(resp->status_code);
+    send(fd, status_text, strlen(status_text), 0);
+    send(fd, "\r\n", 2, 0);
+
+    // Send headers
+    for (size_t i = 0; i < resp->headers_count; ++i)
+    {
+        send(fd, resp->headers[i].name, strlen(resp->headers[i].name), 0);
+        send(fd, ": ", 2, 0);
+        send(fd, resp->headers[i].value, strlen(resp->headers[i].value), 0);
+        send(fd, "\r\n", 2, 0);
+    }
+    send(fd, "\r\n", 2, 0);
+
+    // Send content
+    send(fd, resp->response, resp->response_size, 0);
 }

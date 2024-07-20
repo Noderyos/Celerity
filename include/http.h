@@ -5,6 +5,9 @@
 #include <string.h>
 #include <stdarg.h>
 #include <malloc.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+
 
 
 #define MAX_HEADER_NAME_SIZE 40
@@ -48,8 +51,6 @@ typedef struct {
 
 typedef http_response (*handle_t)(http_request *);
 
-http_response handle_request(http_request *req);
-
 int parse_before_header(http_request *req, char* line);
 int parse_header(http_request *req, char* line);
 
@@ -57,6 +58,9 @@ char* get_header(http_request *req, char *name);
 int set_header(http_response *resp, char *name, char *value);
 http_response generate_error(http_request *req, unsigned int status);
 char* get_status_text(unsigned int status);
+
+int parse_http_headers(int fd, http_request *req);
+void send_response(int fd, http_response *resp);
 
 char* pretty_method(http_method method);
 
