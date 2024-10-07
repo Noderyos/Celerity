@@ -96,7 +96,7 @@ struct {
 } routes[256];
 size_t route_count = 0;
 
-#define STATUS_COUNT 6
+#define STATUS_COUNT 75
 
 struct http_status{
     unsigned int code;
