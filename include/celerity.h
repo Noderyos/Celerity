@@ -453,15 +453,15 @@ handle_t celerity_get_handle(celerity_request *req){
     regex_t regex;
     for (size_t i = 0; i < route_count; ++i)
     {
-        if (regcomp(&regex, routes[i].path, 0)) {
+        if (regcomp(&regex, routes[i].path, 0))
+        {
             fprintf(stderr, "Could not compile regex\n");
             return NULL;
         }
 
-        int reti = regexec(&regex, req->path, 0, NULL, 0);
-        if (routes[i].method == req->method && !reti) {
+        if (routes[i].method == req->method && !regexec(&regex, req->path, 0, NULL, 0))
             return routes[i].func;
-        }
+
         regfree(&regex);
     }
     return NULL;
