@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include <string.h>
-#include <stdarg.h>
+#include <regex.h>
 #include <malloc.h>
 #include <arpa/inet.h>
 #include <unistd.h>
@@ -450,10 +450,19 @@ void celerity_send_response(int fd, celerity_response *resp)
 
 
 handle_t celerity_get_handle(celerity_request *req){
+    regex_t regex;
     for (size_t i = 0; i < route_count; ++i)
     {
-        if(routes[i].method == req->method && strcmp(routes[i].path, req->path) == 0)
+        if (regcomp(&regex, routes[i].path, 0)) {
+            fprintf(stderr, "Could not compile regex\n");
+            return NULL;
+        }
+
+        int reti = regexec(&regex, req->path, 0, NULL, 0);
+        if (routes[i].method == req->method && !reti) {
             return routes[i].func;
+        }
+        regfree(&regex);
     }
     return NULL;
 }

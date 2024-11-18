@@ -7,7 +7,7 @@ int main(void)
 {
     celerity_init(8080);
 
-    celerity_route(HTTP_GET, "/uwu", handle_request);
+    celerity_route(HTTP_GET, "/static/.*", handle_request);
     celerity_post("/uwu", handle_request);
 
     celerity_listen(10);
