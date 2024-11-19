@@ -335,7 +335,7 @@ celerity_response celerity_generate_error(unsigned int status)
     celerity_response resp = {};
 
     resp.status_code = status;
-    resp.response = celerity_get_status_text(status);
+    resp.response = strdup(celerity_get_status_text(status));
     resp.response_size = strlen(resp.response);
 
     return resp;
@@ -492,9 +492,12 @@ void celerity_handle_client(int fd, struct sockaddr_in client_addr)
     printf("%s - %s %s - %d\n",
            client_ip, celerity_pretty_method(req.method), req.path, resp.status_code);
 
+    char content_length[MAX_HEADER_SIZE];
+    snprintf(content_length, MAX_HEADER_SIZE, "%ld", resp.response_size);
+    celerity_set_header(&resp, "Content-Length", content_length);
     celerity_send_response(fd, &resp);
 
-    if(error_code == 0 && handle) free(resp.response);
+    free(resp.response);
 
     close(fd);
 }
