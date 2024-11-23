@@ -5,6 +5,7 @@
 #include <string.h>
 #include <regex.h>
 #include <malloc.h>
+#include <signal.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -216,6 +217,8 @@ void celerity_init(unsigned int port)
         perror("bind");
         exit(1);
     }
+
+    signal(SIGPIPE, SIG_IGN);
 }
 
 void celerity_listen(int max_clients){
